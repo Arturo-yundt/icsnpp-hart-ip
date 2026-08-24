@@ -8,67 +8,74 @@
 
 namespace HART_IP_CONVERSION
 {
-    std::string latin1Conversion(const hilti::rt::Bytes &data)    {
+    // Spicy exports its version in `PROJECT_VERSION_NUMBER`.
+    // hilti::rt::String was introduced in HILTI 1.16 (Zeek 8.2.1); on
+    // earlier versions (e.g. Zeek 8.0.9 / HILTI 1.14.2) it doesn't exist,
+    // so fall back to std::string there.
+#if PROJECT_VERSION_NUMBER >= 11600
+    using SpicyString = hilti::rt::String;
+#else
+    using SpicyString = std::string;
+#endif
+
+    SpicyString latin1Conversion(const hilti::rt::Bytes &data) {
         std::string returnValue;
+        returnValue.reserve(data.size());
         const char *char_ptr = (const char *) data.data();
-        for(std::size_t i = 0; i < data.size(); ++i)
-        {
-            //if(0 == char_ptr[i])
-            //{
-            //    break;
-            //}
+        for (std::size_t i = 0; i < data.size(); ++i) {
             returnValue += char_ptr[i];
         }
-        return returnValue;
+        return {returnValue};
     }
 
-    std::string dateConversion(const hilti::rt::Bytes &data)    {
+    SpicyString dateConversion(const hilti::rt::Bytes &data)    {
         if(data.size() < 3)
         {
             printf("[error] Date Type Improper Byte Length (%li), must be 3\n", (long) data.size());
-            return "";
+            return {};
         }
 
         const char *char_ptr = (const char *) data.data();
-	
+
         unsigned char day = char_ptr[0];
         unsigned char month = char_ptr[1];
         unsigned char shortYear = char_ptr[2];
         unsigned int longYear = 1900 + shortYear;
 
-	// Month name lookup
-	// Lines from here to end of function are additions
-	// for converting to Month Day, Year format
+    // Month name lookup
+    // Lines from here to end of function are additions
+    // for converting to Month Day, Year format
     // Default logging as Month (string) Day, Year
-    	static const std::string months[] = {
-        	"", "January", "February", "March", "April", "May", "June",
-        	"July", "August", "September", "October", "November", "December"
-    	};
+        static const std::string months[] = {
+            "", "January", "February", "March", "April", "May", "June",
+            "July", "August", "September", "October", "November", "December"
+        };
 
-	std::string monthName = "";
-	if(month >= 1 && month <= 12) {
-		monthName = months[month];
-	}
-	else {
-		monthName = "InvalidMonth";
-	}
+    std::string monthName;
+    if(month >= 1 && month <= 12) {
+        monthName = months[month];
+    }
+    else {
+        monthName = "InvalidMonth";
+    }
 
-	return monthName + " " + std::to_string(day) + ", " + std::to_string(longYear);
+    std::string result = monthName + " " + std::to_string(day) + ", " + std::to_string(longYear);
+    return {result};
 
     // Remove the comments on lines 58-60 and comment out lines 43-56 to log as Month-Day-Year in integers
-	//return std::to_string(month) + "-" +
+    //return std::to_string(month) + "-" +
         //       std::to_string(day) + "-" +
         //       std::to_string(longYear);
     }
 
-    std::string timeConversion(const hilti::rt::Bytes &data)    {
+    SpicyString timeConversion(const hilti::rt::Bytes &data)    {
         const unsigned int MILLISECOND_PARTS = 32;
         const unsigned int SECONDS_PER_MINUTE = 60;
         const unsigned int MINUTES_PER_HOUR = 60;
         if(data.size() < 4)
         {
             printf("[error] Time Type Improper Byte Length (%li), must be 4\n", (long) data.size());
-            return "";
+            return {};
         }
         const char *char_ptr = (const char *) data.data();
         unsigned int time = 0;
@@ -85,8 +92,8 @@ namespace HART_IP_CONVERSION
         unsigned int minutesPart = totalMinutes % MINUTES_PER_HOUR;
         unsigned int hoursPart = totalMinutes / MINUTES_PER_HOUR;
 
-        std::string returnString = "";
-        std::string tempString = "";
+        std::string returnString;
+        std::string tempString;
         if(0 < secondsPart || 0.0 < fractionPart)
         {
             returnString = std::to_string(fractionPart + secondsPart) +
@@ -95,7 +102,7 @@ namespace HART_IP_CONVERSION
         if(0 < minutesPart)
         {
             tempString = std::to_string(minutesPart) + " minutes";
-            if("" != returnString)
+            if(!returnString.empty())
             {
                 tempString += ", ";
             }
@@ -104,17 +111,17 @@ namespace HART_IP_CONVERSION
         if(0 < hoursPart)
         {
             tempString = std::to_string(hoursPart) + " hours";
-            if("" != returnString)
+            if(!returnString.empty())
             {
                 tempString += ", ";
             }
             returnString = tempString + returnString;
         }
 
-        return returnString;
+        return {returnString};
     }
 
-    std::string packedConversion(const hilti::rt::Bytes &data)    {
+    SpicyString packedConversion(const hilti::rt::Bytes &data)    {
         const int INPUT_CHARS = 3;
         const int OUTPUT_CHARS = 4;
         const int BITS_PER_BYTE = 8;
@@ -122,11 +129,11 @@ namespace HART_IP_CONVERSION
         // MAP from TS20099 (v11.0) 5.1.1, Table 1
         // Note: there are other ways to do this, this just seems easy for now.
         const std::string MAP = "@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\\]^_ !\"#$%&'()*+,-./0123456789:;<=>?";
-            
+
         if(0 != data.size() % INPUT_CHARS)
         {
             printf("[error] Packed Type Improper Byte Length (%li), must be divisible by %i\n", (long) data.size(), INPUT_CHARS);
-            return "";
+            return {};
         }
         std::string outputString;
 
@@ -157,7 +164,7 @@ namespace HART_IP_CONVERSION
                     else
                     {
                         printf("[error] Packed Type Improper Character Encoding\n");
-                        return "";
+                        return {};
                     }
                     // Reset things in preparation for the next set of NEEDED_BITS
                     processedBits = 0;
@@ -166,8 +173,7 @@ namespace HART_IP_CONVERSION
             }
         }
 
-        return outputString;
+        return {outputString};
     }
 
 }
-
