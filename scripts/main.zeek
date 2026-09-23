@@ -56,7 +56,7 @@ const udp_ports = {
 };
 
 # Additional HART-IP ports supplied through env variable.
-global hartip_ports_str: string = getenv("ZEEK_HARTIP_PORTS");
+global hartip_ports_str: string = getenv("ZEEK_HART_IP_PORTS");
 
 # Initialization Function
 event zeek_init() &priority=5 {
